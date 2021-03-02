@@ -23,7 +23,8 @@ def livestream():
             proc.kill()
         process.kill()
     else:
-        RTMP_PATH = "rtmp://127.0.0.1:1935/live/"+subdomain
+        RTMP_PATH = "rtmp://bom01.contribute.live-video.net/app/live_656490184_THjxxhho7zir5R6Rh9xoK3JnSdZiNJ"#"rtmp://127.0.0.1:1935/live/"+subdomain
+
         process = (
             ffmpeg 
             .input('https://images.platoo.in/video/glassblower_glass_heat_glowing_hot_354.mp43d437149303e467883155300b76a4f3e.mp4',stream_loop="-1")
@@ -37,7 +38,7 @@ def livestream():
             .global_args("-nostdin") 
             .overwrite_output()
         )
-        process = process.run_async(pipe_stdin=True)
+        process = process.run_async(pipe_stdin=False)
         is_subdomain = mongo.db.ffmpeg.update({"subdomain":subdomain},{"$set":{"pid":process.pid}},upsert=True)
     return jsonify({"status":"successfully runing"})
    

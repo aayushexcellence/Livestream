@@ -1,0 +1,11 @@
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=RTP Video
+c=IN IP4 127.0.0.1
+t=0 0
+a=tool:libavformat 58.29.100
+m=audio 6105 RTP/AVP 111
+a=rtpmap:111 OPUS/48000/2
+m=video 6102 RTP/AVP 102
+a=rtpmap:102 h264/90000
+a=fmtp:100 packetization-mode=1
