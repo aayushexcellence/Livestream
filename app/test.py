@@ -1,3 +1,4 @@
+"""
 import json
 import time
 import psutil
@@ -26,3 +27,20 @@ process = (
 )
 
 process = process.run_async(pipe_stdin=False)
+"""
+"""
+import cv2
+cap = cv2.VideoCapture("rtmp://bom01.contribute.live-video.net/app/live_656490184_THjxxhho7zir5R6Rh9xoK3JnSdZiNJ")
+
+while(cap.isOpened()):
+    ret, frame = cap.read()
+    cv2.imshow('frame', frame)
+    if cv2.waitKey(20) & 0xFF == ord('q'):
+        break
+cap.release()
+cv2.destroyAllWindows()
+"""
+import cv2
+myrtmp_addr = "rtmp://bom01.contribute.live-video.net/app/live_656490184_THjxxhho7zir5R6Rh9xoK3JnSdZiNJ"
+cap = cv2.VideoCapture(myrtmp_addr)
+frame,err = cap.read()

@@ -13,9 +13,17 @@ import subprocess
 bp = Blueprint('ffmpeg', __name__, url_prefix='/')
 
 
+Rmtp_json = {
+    "youtube":"rtmp://a.rtmp.youtube.com/live2/xuzk-dc7m-9zc3-zy0k-8wck",
+    "twitch":"rtmp://bom01.contribute.live-video.net/app/live_656490184_THjxxhho7zir5R6Rh9xoK3JnSdZiNJ",
+    "facebook":"rtmps://live-api-s.facebook.com:443/rtmp/1412237025777635?s_bl=1&s_ps=1&s_psm=1&s_sw=0&s_vt=api-s&a=AbzVxXXUA44qNyEy",
+    "vimeo":"rtmps://rtmp-global.cloud.vimeo.com:443/live/037fe25f-9fa2-4829-a61c-3963f3d395c9"
+}
+
 @bp.route('/livestream', methods=['GET'])
 def livestream():
     state = request.args.get("state")
+    pid = request.args.get("pid")
     platform = request.args.get("platform")
     subdomain = request.args.get("subdomain")
     audio_port = request.args.get("audio_port")
@@ -37,18 +45,49 @@ def livestream():
                 pass
             return jsonify({"status":"stopped"})
     else:
-        if platform == "youtube":
-            RTMP_PATH = "rtmp://a.rtmp.youtube.com/live2/xuzk-dc7m-9zc3-zy0k-8wck"
-        elif platform == "twitch":
-            RTMP_PATH = "rtmp://bom01.contribute.live-video.net/app/live_656490184_THjxxhho7zir5R6Rh9xoK3JnSdZiNJ"
-        elif platform == "facebook":
-            RTMP_PATH = "rtmps://live-api-s.facebook.com:443/rtmp/1412237025777635?s_bl=1&s_ps=1&s_psm=1&s_sw=0&s_vt=api-s&a=AbzVxXXUA44qNyEy"
+        if pid is None:
+            if platform == "youtube":
+                RTMP_PATH = "rtmp://a.rtmp.youtube.com/live2/xuzk-dc7m-9zc3-zy0k-8wck"
+            elif platform == "twitch":
+                RTMP_PATH = "rtmp://bom01.contribute.live-video.net/app/live_656490184_THjxxhho7zir5R6Rh9xoK3JnSdZiNJ"
+            elif platform == "facebook":
+                RTMP_PATH = "rtmps://live-api-s.facebook.com:443/rtmp/1412237025777635?s_bl=1&s_ps=1&s_psm=1&s_sw=0&s_vt=api-s&a=AbzVxXXUA44qNyEy"
+            elif platform == "vimeo":
+                RTMP_PATH = "rtmps://rtmp-global.cloud.vimeo.com:443/live/037fe25f-9fa2-4829-a61c-3963f3d395c9"
+            else:
+                RTMP_PATH = "rtmp://127.0.0.1:1935/live/"+subdomain
+            writesdp(subdomain,audio_port,video_port,host)
+            command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
+            process = subprocess.Popen(command,shell=True)        
+            is_subdomain = mongo.db.ffmpeg.update({"subdomain":subdomain},{"$set":{"pid":process.pid}},upsert=True)
+            time.sleep(10)
+            with open(str(dir_path)+"/logs/"+str(subdomain)+".log") as file: 
+                for line in (file.readlines() [:500]): 
+                    if "bind failed: Address already in use" in line:
+                        return jsonify({"status":"bind failed: Address already in use"})
         else:
-            RTMP_PATH = "rtmp://127.0.0.1:1935/live/"+subdomain
-        writesdp(subdomain,audio_port,video_port,host)
-        command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+subdomain+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
-        process = subprocess.Popen(command,shell=True)        
-        is_subdomain = mongo.db.ffmpeg.update({"subdomain":subdomain},{"$set":{"pid":process.pid}},upsert=True)
+            platform_list = platform.split(",")
+            try:
+                process = psutil.Process(int(pid))
+                for proc in process.children(recursive=True):
+                    proc.kill()
+                process.kill()
+            except Exception:
+                pass
+            if len(platform_list) == 2:
+                command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c copy -f flv "+str(Rmtp_json[platform_list[0]])+" -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(Rmtp_json[platform_list[1]])+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
+            if len(platform_list) == 3:
+                command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
+            writesdp(subdomain,audio_port,video_port,host)
+            #command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
+            process = subprocess.Popen(command,shell=True)        
+            is_subdomain = mongo.db.ffmpeg.update({"subdomain":subdomain},{"$set":{"pid":process.pid}},upsert=True)
+            time.sleep(10)
+            with open(str(dir_path)+"/logs/"+str(subdomain)+".log") as file: 
+                for line in (file.readlines() [:500]): 
+                    if "bind failed: Address already in use" in line:
+                        return jsonify({"status":"bind failed: Address already in use"})
+
     return jsonify({"status":"successfully running","pid":process.pid})
    
 
@@ -67,11 +106,11 @@ def writesdp(subdomain,audio_port,video_port,host):
     for line in default_file:
     #write that line to the new file
         if "AUDIOPORT" in line:
-            replaced_line = line.replace("AUDIOPORT",''+audio_port+'')
+            replaced_line = line.replace("AUDIOPORT",''+str(audio_port)+'')
         elif "VIDEOPORT" in line:
-            replaced_line = line.replace("VIDEOPORT",''+video_port+'')
+            replaced_line = line.replace("VIDEOPORT",''+str(video_port)+'')
         elif "HOST" in line:
-            replaced_line = line.replace("HOST",''+host+'')
+            replaced_line = line.replace("HOST",''+str(host)+'')
         else:
             replaced_line = line
         file1.write(replaced_line)
