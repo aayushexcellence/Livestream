@@ -51,13 +51,13 @@ def livestream():
             elif platform == "twitch":
                 RTMP_PATH = "rtmp://bom01.contribute.live-video.net/app/live_656490184_THjxxhho7zir5R6Rh9xoK3JnSdZiNJ"
             elif platform == "facebook":
-                RTMP_PATH = "rtmps://live-api-s.facebook.com:443/rtmp/1412237025777635?s_bl=1&s_ps=1&s_psm=1&s_sw=0&s_vt=api-s&a=AbzVxXXUA44qNyEy"
+                RTMP_PATH = "rtmps://live-api-s.facebook.com:443/rtmp/1418625858472085?s_bl=1&s_psm=1&s_sc=1418625885138749&s_sw=0&s_vt=api-s&a=Abx0I9C5X7H_iUyk"
             elif platform == "vimeo":
                 RTMP_PATH = "rtmps://rtmp-global.cloud.vimeo.com:443/live/037fe25f-9fa2-4829-a61c-3963f3d395c9"
             else:
                 RTMP_PATH = "rtmp://127.0.0.1:1935/live/"+subdomain
             writesdp(subdomain,audio_port,video_port,host)
-            command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
+            command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
             process = subprocess.Popen(command,shell=True)        
             is_subdomain = mongo.db.ffmpeg.update({"subdomain":subdomain},{"$set":{"pid":process.pid}},upsert=True)
             time.sleep(10)
@@ -66,28 +66,29 @@ def livestream():
                     if "bind failed: Address already in use" in line:
                         return jsonify({"status":"bind failed: Address already in use"})
         else:
-            platform_list = platform.split(",")
             try:
-                process = psutil.Process(int(pid))
-                for proc in process.children(recursive=True):
-                    proc.kill()
-                process.kill()
-            except Exception:
-                pass
-            if len(platform_list) == 2:
-                command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c copy -f flv "+str(Rmtp_json[platform_list[0]])+" -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(Rmtp_json[platform_list[1]])+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
-            if len(platform_list) == 3:
-                command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
-            writesdp(subdomain,audio_port,video_port,host)
-            #command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -stream_loop -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
-            process = subprocess.Popen(command,shell=True)        
-            is_subdomain = mongo.db.ffmpeg.update({"subdomain":subdomain},{"$set":{"pid":process.pid}},upsert=True)
-            time.sleep(10)
-            with open(str(dir_path)+"/logs/"+str(subdomain)+".log") as file: 
-                for line in (file.readlines() [:500]): 
-                    if "bind failed: Address already in use" in line:
-                        return jsonify({"status":"bind failed: Address already in use"})
-
+                platform_list = platform.split(",")
+                try:
+                    process = psutil.Process(int(pid))
+                    for proc in process.children(recursive=True):
+                        proc.kill()
+                    process.kill()
+                except Exception:
+                    pass
+                if len(platform_list) == 2:
+                    command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c copy -c:a aac -ar 16k -ac 1 -vcodec h264 -preset ultrafast -tune zerolatency -f flv "+str(Rmtp_json[platform_list[0]])+" -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(Rmtp_json[platform_list[1]])+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
+                if len(platform_list) == 3:
+                    command = "ffmpeg -protocol_whitelist file,rtp,udp,https,tls,tcp -1 -i "+str(dir_path)+"/janus/"+str(subdomain)+".sdp -c:v libx264 -c:a aac -ar 16k -ac 1 -preset ultrafast -tune zerolatency -f flv "+str(RTMP_PATH)+" 2> "+str(dir_path)+"/logs/"+str(subdomain)+".log"
+                writesdp(subdomain,audio_port,video_port,host)
+                process = subprocess.Popen(command,shell=True)        
+                is_subdomain = mongo.db.ffmpeg.update({"subdomain":subdomain},{"$set":{"pid":process.pid}},upsert=True)
+                time.sleep(10)
+                with open(str(dir_path)+"/logs/"+str(subdomain)+".log") as file: 
+                    for line in (file.readlines() [:500]): 
+                        if "bind failed: Address already in use" in line:
+                            return jsonify({"status":"bind failed: Address already in use"})
+            except Exception as e:
+                return jsonify({"status":"err","error":str(e)})            
     return jsonify({"status":"successfully running","pid":process.pid})
    
 
